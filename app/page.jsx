@@ -30,45 +30,37 @@ const COMPLETED_KEY = "completedProjects_v1";
 const COMPLETED_UI_KEY = "completedPanelOpen_v1";
 
 export default function Home() {
-  const [generated, setGenerated] = useState([]);
+  const [ideasList, setIdeasList] = useState([]);
   const [skillProgress, setSkillProgress] = useState({});
-  const [featuredIdeaId, setFeaturedIdeaId] = useState(null);
+  const [featuredId, setFeaturedId] = useState(null);
 
-  // ✅ Toast (must be top-level, not inside useEffect)
   const [toast, setToast] = useState("");
-  const [showToast, setShowToast] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
 
-  const fireToast = (msg) => {
-    setToast(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 1200);
-  };
-
-  // completed projects (stored)
-  const [completed, setCompleted] = useState([]); // [{id, title}]
+  const [completed, setCompleted] = useState([]);
   const [completedOpen, setCompletedOpen] = useState(true);
 
-  // 🌍 Language
   const [lang, setLang] = useState("en");
   const t = messages[lang] || messages.en;
 
-  // 🌗 Theme
   const [theme, setTheme] = useState("light");
+
+  const showMessage = (msg) => {
+    setToast(msg);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 1200);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") || "light";
     setTheme(saved);
     document.documentElement.setAttribute("data-theme", saved);
 
-    // load completed projects
     try {
-      const savedCompleted = JSON.parse(
-        localStorage.getItem(COMPLETED_KEY) || "[]"
-      );
+      const savedCompleted = JSON.parse(localStorage.getItem(COMPLETED_KEY) || "[]");
       if (Array.isArray(savedCompleted)) setCompleted(savedCompleted);
     } catch {}
 
-    // load panel open/closed
     try {
       const open = localStorage.getItem(COMPLETED_UI_KEY);
       if (open !== null) setCompletedOpen(open === "true");
@@ -89,18 +81,13 @@ export default function Home() {
   }, [completedOpen]);
 
   const toggleSkill = (skill) => {
-    setSkillProgress((prev) => ({
-      ...prev,
-      [skill]: !prev[skill],
-    }));
+    setSkillProgress((prev) => ({ ...prev, [skill]: !prev[skill] }));
   };
 
-  const generateIdeas = () => {
-    const selectedSkills = Object.keys(skillProgress).filter(
-      (s) => skillProgress[s]
-    );
+  const buildRankedIdeas = () => {
+    const selectedSkills = Object.keys(skillProgress).filter((s) => skillProgress[s]);
 
-    const ranked = ideas
+    return ideas
       .map((idea) => {
         const core = idea.coreSkills || [];
         const stretch = idea.stretchSkills || [];
@@ -109,25 +96,24 @@ export default function Home() {
         const matches = matched.length;
 
         const ideaSkills = [...core, ...stretch];
-        const recommended = ideaSkills.filter(
-          (s) => !selectedSkills.includes(s)
-        );
+        const recommended = ideaSkills.filter((s) => !selectedSkills.includes(s));
 
         const whyParts = [];
         if (matched.length > 0) {
           whyParts.push(
-            `${t.whyMatched ?? "Matches your skills"}: ${matched
-              .slice(0, 4)
-              .join(", ")}${matched.length > 4 ? "…" : ""}`
+            `${t.whyMatched ?? "Matches your skills"}: ${matched.slice(0, 4).join(", ")}${
+              matched.length > 4 ? "…" : ""
+            }`
           );
         } else {
           whyParts.push(t.whyFresh ?? "New skills (good stretch)");
         }
+
         if (recommended.length > 0) {
           whyParts.push(
-            `${t.whyNext ?? "Try next"}: ${recommended
-              .slice(0, 3)
-              .join(", ")}${recommended.length > 3 ? "…" : ""}`
+            `${t.whyNext ?? "Try next"}: ${recommended.slice(0, 3).join(", ")}${
+              recommended.length > 3 ? "…" : ""
+            }`
           );
         }
 
@@ -135,46 +121,30 @@ export default function Home() {
       })
       .sort((a, b) => b.matches - a.matches)
       .slice(0, 6);
-
-    setGenerated(ranked);
-    setFeaturedIdeaId(null);
   };
 
-  // 🎲 Surprise me: auto-generate if empty
+  const generateIdeas = () => {
+    const ranked = buildRankedIdeas();
+    setIdeasList(ranked);
+    setFeaturedId(null);
+  };
+
   const surpriseMe = () => {
-    let pool = generated;
+    let pool = ideasList;
 
     if (!pool.length) {
-      const selectedSkills = Object.keys(skillProgress).filter(
-        (s) => skillProgress[s]
-      );
-
-      pool = ideas
-        .map((idea) => {
-          const core = idea.coreSkills || [];
-          const stretch = idea.stretchSkills || [];
-          const matched = core.filter((s) => selectedSkills.includes(s));
-          const matches = matched.length;
-          const ideaSkills = [...core, ...stretch];
-          const recommended = ideaSkills.filter(
-            (s) => !selectedSkills.includes(s)
-          );
-          return { ...idea, matches, recommended, why: "" };
-        })
-        .sort((a, b) => b.matches - a.matches)
-        .slice(0, 6);
-
-      setGenerated(pool);
+      pool = buildRankedIdeas();
+      setIdeasList(pool);
     }
 
     const pick = pool[Math.floor(Math.random() * pool.length)];
-    setFeaturedIdeaId(pick.id);
+    setFeaturedId(pick.id);
   };
 
   const clearAll = () => {
     setSkillProgress({});
-    setGenerated([]);
-    setFeaturedIdeaId(null);
+    setIdeasList([]);
+    setFeaturedId(null);
   };
 
   const handleProjectComplete = ({ id, title }) => {
@@ -183,7 +153,7 @@ export default function Home() {
     setCompleted((prev) => {
       if (prev.some((p) => p.id === id)) return prev;
 
-      fireToast(t.savedToCompleted ?? "Saved to Completed ✅");
+      showMessage(t.savedToCompleted ?? "Saved to completed");
 
       return [{ id, title: title || `Project ${id}` }, ...prev];
     });
@@ -194,7 +164,7 @@ export default function Home() {
   };
 
   const openCompletedIdea = (id) => {
-    setFeaturedIdeaId(id);
+    setFeaturedId(id);
     setCompletedOpen(false);
   };
 
@@ -203,7 +173,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto max-w-5xl px-4 py-10 text-center relative">
-        {/* Toggles */}
         <div className="flex justify-end gap-2 mb-6">
           <button
             onClick={() => setLang(lang === "en" ? "mn" : "en")}
@@ -216,13 +185,12 @@ export default function Home() {
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-sm hover:opacity-80 transition"
           >
-            {theme === "light" ? "🌙 Dark" : "☀️ Light"}
+            {theme === "light" ? "Dark" : "Light"}
           </button>
         </div>
 
         <h1 className="text-3xl font-bold mb-6">{t.appTitle}</h1>
 
-        {/* Skill selector */}
         <div className="mb-8 bg-[var(--card)] border border-[var(--border)] rounded-xl p-4">
           <h2 className="text-sm font-semibold mb-3">{t.skillsTitle}</h2>
 
@@ -243,7 +211,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Generate + Surprise + Clear */}
         <div className="flex flex-wrap justify-center gap-3 mb-6">
           <button
             onClick={generateIdeas}
@@ -256,7 +223,7 @@ export default function Home() {
             onClick={surpriseMe}
             className="px-6 py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition"
           >
-            🎲 {t.surpriseMe ?? "Surprise me"}
+            {t.surpriseMe ?? "Surprise me"}
           </button>
 
           <button
@@ -268,20 +235,19 @@ export default function Home() {
         </div>
 
         <IdeaList
-          items={generated}
+          items={ideasList}
           lang={lang}
           onSkillClick={toggleSkill}
-          featuredIdeaId={featuredIdeaId}
+          featuredIdeaId={featuredId}
           onProjectComplete={handleProjectComplete}
         />
 
-        {/* ✅ Completed Projects Panel */}
         <div className="fixed bottom-4 right-4 z-50">
           {completedOpen ? (
             <div className="w-[min(22rem,92vw)] bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
                 <div className="text-sm font-semibold">
-                  ✅ {t.completedTitle ?? "Completed"}{" "}
+                  {t.completedTitle ?? "Completed"}{" "}
                   <span className="opacity-70">({completedCount})</span>
                 </div>
                 <button
@@ -296,8 +262,7 @@ export default function Home() {
               <div className="max-h-[50vh] overflow-auto p-3">
                 {completedCount === 0 ? (
                   <div className="text-sm opacity-70 px-1 py-2">
-                    {t.completedEmpty ??
-                      "Finish a project and it will show up here ✨"}
+                    {t.completedEmpty ?? "Finish a project and it will appear here."}
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-2">
@@ -309,7 +274,7 @@ export default function Home() {
                         <button
                           onClick={() => openCompletedIdea(p.id)}
                           className="flex-1 text-left text-sm hover:opacity-80 transition"
-                          title="Jump back to this idea"
+                          title="Open"
                         >
                           {p.title}
                         </button>
@@ -317,7 +282,7 @@ export default function Home() {
                         <button
                           onClick={() => removeCompleted(p.id)}
                           className="text-xs opacity-60 hover:opacity-100 transition"
-                          title="Remove from list"
+                          title="Remove"
                         >
                           ✕
                         </button>
@@ -333,15 +298,14 @@ export default function Home() {
               className="rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-lg px-4 py-2 text-sm hover:opacity-90 transition"
               title="Open completed projects"
             >
-              ✅ {t.completedTitle ?? "Completed"} ({completedCount})
+              {t.completedTitle ?? "Completed"} ({completedCount})
             </button>
           )}
         </div>
 
-        {/* ✅ Toast */}
         <div
           className={`fixed left-1/2 -translate-x-1/2 bottom-6 z-[9999] transition-all duration-300 ${
-            showToast
+            toastVisible
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-2 pointer-events-none"
           }`}

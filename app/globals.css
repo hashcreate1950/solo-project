@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* Manual themes */
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -26,7 +25,6 @@ body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
-/* Confetti */
 @keyframes confetti-fall {
   0% {
     transform: translateY(-100%) rotate(0deg);

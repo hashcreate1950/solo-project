@@ -23,11 +23,12 @@ export default function IdeaCard({
   featured = false,
 }) {
   const t = messages[lang] || messages.en;
-const reportedCompleteRef = useRef(false);
+
+  const reportedCompleteRef = useRef(false);
+  const confettiTimer = useRef(null);
 
   const shownTitle = typeof title === "object" ? title?.[lang] : title;
-  const shownDesc =
-    typeof description === "object" ? description?.[lang] : description;
+  const shownDesc = typeof description === "object" ? description?.[lang] : description;
   const shownSteps = Array.isArray(steps) ? steps : steps?.[lang] || [];
 
   const { checked, toggle, progress } = useProjectProgress(id, shownSteps.length);
@@ -37,34 +38,27 @@ const reportedCompleteRef = useRef(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState(null);
 
-  const confettiTimer = useRef(null);
-
   const burstConfetti = () => {
     setShowConfetti(true);
     if (confettiTimer.current) clearTimeout(confettiTimer.current);
     confettiTimer.current = setTimeout(() => setShowConfetti(false), 1500);
   };
 
-useEffect(() => {
-  if (progress === 100) {
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 1500);
+  useEffect(() => {
+    if (progress === 100) {
+      burstConfetti();
 
-    if (!reportedCompleteRef.current) {
-      reportedCompleteRef.current = true;
-
-      const safeTitle = shownTitle || title?.en || title || `Project ${id}`;
-      onProjectComplete?.({ id, title: safeTitle });
+      if (!reportedCompleteRef.current) {
+        reportedCompleteRef.current = true;
+        const safeTitle = shownTitle || title?.en || title || `Project ${id}`;
+        onProjectComplete?.({ id, title: safeTitle });
+      }
     }
-  }
-}, [progress]); 
+  }, [progress]); // eslint-disable-line react-hooks/exhaustive-deps
 
-useEffect(() => {
-  if (progress < 100) {
-    reportedCompleteRef.current = false;
-  }
-}, [progress]);
-
+  useEffect(() => {
+    if (progress < 100) reportedCompleteRef.current = false;
+  }, [progress]);
 
   useEffect(() => {
     return () => {
@@ -82,7 +76,6 @@ useEffect(() => {
         featured ? "breathing-card ring-2 ring-blue-300/60" : ""
       }`}
     >
-      {/* Confetti */}
       {showConfetti && (
         <div className="confetti">
           {Array.from({ length: 20 }).map((_, i) => (
@@ -98,20 +91,14 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0">
-          <h3 className="text-base sm:text-lg font-semibold break-words">
-            {shownTitle}
-          </h3>
+          <h3 className="text-base sm:text-lg font-semibold break-words">{shownTitle}</h3>
           <p className="text-sm mt-1 opacity-80 break-words">{shownDesc}</p>
 
-          {/* Why this idea */}
           {why && (
             <p className="text-xs mt-2 opacity-70">
-              <span className="font-semibold">
-                {t.whyThisIdea ?? "Why this idea?"}
-              </span>{" "}
+              <span className="font-semibold">{t.whyThisIdea ?? "Why this idea?"}</span>{" "}
               {why}
             </p>
           )}
@@ -128,7 +115,6 @@ useEffect(() => {
         </button>
       </div>
 
-      {/* Tags + Start */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">{difficulty}</span>
         <span className="px-2 py-1 rounded bg-purple-100 text-purple-700">{category}</span>
@@ -140,11 +126,10 @@ useEffect(() => {
           className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition active:scale-95"
           title="Start this project"
         >
-          🚀 {t.start ?? "Start"}
+          {t.start ?? "Start"}
         </button>
       </div>
 
-      {/* Core Skills */}
       <div>
         <p className="text-sm font-medium">{t.coreSkills}</p>
         <div className="flex flex-wrap gap-2 mt-2">
@@ -173,7 +158,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Stretch Skills */}
       <div>
         <p className="text-sm font-medium">{t.stretchSkills}</p>
         <div className="flex flex-wrap gap-2 mt-2">
@@ -202,11 +186,10 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Recommended skill chips (clickable) */}
       {recommended?.length > 0 && (
         <div className="pt-2 border-t border-[var(--border)]">
           <p className="text-xs font-semibold opacity-70 mb-2">
-            💡 {t.recommendSkillsCard ?? "Recommended skills"}
+            {t.recommendSkillsCard ?? "Recommended skills"}
           </p>
           <div className="flex flex-wrap gap-2">
             {recommended.map((skill) => (
@@ -214,7 +197,7 @@ useEffect(() => {
                 key={skill}
                 onClick={() => onSkillClick?.(skill)}
                 className="px-2 py-1 rounded-full text-xs border border-[var(--border)] bg-[var(--card)] hover:bg-blue-50 hover:text-blue-700 transition"
-                title="Click to add this skill"
+                title="Add this skill"
               >
                 + {skill}
               </button>
@@ -223,7 +206,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Progress */}
       <div>
         <div className="flex justify-between text-sm mb-1">
           <span>{t.progress}</span>
@@ -246,7 +228,6 @@ useEffect(() => {
         )}
       </div>
 
-      {/* Steps */}
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium mt-2">{t.steps}</p>
         <ul className="flex flex-col gap-2">
