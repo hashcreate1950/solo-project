@@ -1,39 +1,87 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useProjectProgress from "../hooks/useProjectProgress";
 import useFavorites from "../hooks/useFavorites";
 import { skillDescriptions } from "../data/skillDescriptions";
+import { messages } from "../data/messages";
 
 export default function IdeaCard({
+  id,
   title,
   description,
   difficulty,
+  onProjectComplete,
   category,
-  coreSkills,
-  stretchSkills,
+  coreSkills = [],
+  stretchSkills = [],
   steps,
+  recommended = [],
+  why = "",
+  onSkillClick,
+  lang = "en",
+  featured = false,
 }) {
-  const { checked, toggle, progress } = useProjectProgress(title, steps.length);
+  const t = messages[lang] || messages.en;
+const reportedCompleteRef = useRef(false);
+
+  const shownTitle = typeof title === "object" ? title?.[lang] : title;
+  const shownDesc =
+    typeof description === "object" ? description?.[lang] : description;
+  const shownSteps = Array.isArray(steps) ? steps : steps?.[lang] || [];
+
+  const { checked, toggle, progress } = useProjectProgress(id, shownSteps.length);
   const { favorites, toggleFavorite } = useFavorites();
-  const isFav = favorites.includes(title);
+  const isFav = favorites.includes(id);
 
   const [showConfetti, setShowConfetti] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState(null);
 
-  useEffect(() => {
-    if (progress === 100) {
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 1500);
-    }
-  }, [progress]);
+  const confettiTimer = useRef(null);
 
-  const toggleTooltip = (skill) => {
-    setActiveTooltip(activeTooltip === skill ? null : skill);
+  const burstConfetti = () => {
+    setShowConfetti(true);
+    if (confettiTimer.current) clearTimeout(confettiTimer.current);
+    confettiTimer.current = setTimeout(() => setShowConfetti(false), 1500);
+  };
+
+useEffect(() => {
+  if (progress === 100) {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 1500);
+
+    if (!reportedCompleteRef.current) {
+      reportedCompleteRef.current = true;
+
+      const safeTitle = shownTitle || title?.en || title || `Project ${id}`;
+      onProjectComplete?.({ id, title: safeTitle });
+    }
+  }
+}, [progress]); 
+
+useEffect(() => {
+  if (progress < 100) {
+    reportedCompleteRef.current = false;
+  }
+}, [progress]);
+
+
+  useEffect(() => {
+    return () => {
+      if (confettiTimer.current) clearTimeout(confettiTimer.current);
+    };
+  }, []);
+
+  const toggleTooltip = (key) => {
+    setActiveTooltip(activeTooltip === key ? null : key);
   };
 
   return (
-    <div className="relative p-4 rounded-xl bg-white shadow border flex flex-col gap-4 overflow-visible">
+    <div
+      className={`relative p-4 sm:p-5 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow flex flex-col gap-4 overflow-visible ${
+        featured ? "breathing-card ring-2 ring-blue-300/60" : ""
+      }`}
+    >
       {/* Confetti */}
       {showConfetti && (
         <div className="confetti">
@@ -43,26 +91,36 @@ export default function IdeaCard({
               className="confetti-piece"
               style={{
                 left: `${Math.random() * 100}%`,
-                backgroundColor: ["#3b82f6", "#22c55e", "#eab308", "#ec4899"][
-                  i % 4
-                ],
+                backgroundColor: ["#3b82f6", "#22c55e", "#eab308", "#ec4899"][i % 4],
               }}
             />
           ))}
         </div>
       )}
 
-      {/* Favorite button */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <p className="text-sm text-gray-600 mt-1">{description}</p>
+      {/* Header */}
+      <div className="flex justify-between items-start gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base sm:text-lg font-semibold break-words">
+            {shownTitle}
+          </h3>
+          <p className="text-sm mt-1 opacity-80 break-words">{shownDesc}</p>
+
+          {/* Why this idea */}
+          {why && (
+            <p className="text-xs mt-2 opacity-70">
+              <span className="font-semibold">
+                {t.whyThisIdea ?? "Why this idea?"}
+              </span>{" "}
+              {why}
+            </p>
+          )}
         </div>
 
         <button
-          onClick={() => toggleFavorite(title)}
+          onClick={() => toggleFavorite(id)}
           className={`text-2xl leading-none transition ${
-            isFav ? "text-yellow-500" : "text-gray-300"
+            isFav ? "text-yellow-500" : "opacity-40 hover:opacity-70"
           }`}
           aria-label="favorite"
         >
@@ -70,41 +128,45 @@ export default function IdeaCard({
         </button>
       </div>
 
-      {/* Tags */}
-      <div className="flex flex-wrap gap-2 text-xs">
-        <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">
-          {difficulty}
-        </span>
-        <span className="px-2 py-1 rounded bg-purple-100 text-purple-700">
-          {category}
-        </span>
+      {/* Tags + Start */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">{difficulty}</span>
+        <span className="px-2 py-1 rounded bg-purple-100 text-purple-700">{category}</span>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={burstConfetti}
+          className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition active:scale-95"
+          title="Start this project"
+        >
+          🚀 {t.start ?? "Start"}
+        </button>
       </div>
 
       {/* Core Skills */}
       <div>
-        <p className="text-sm font-medium">Core Skills:</p>
-        <div className="flex flex-wrap gap-2 mt-1">
-          {coreSkills.map((s, i) => (
-            <div key={i} className="relative group">
+        <p className="text-sm font-medium">{t.coreSkills}</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {coreSkills.map((s) => (
+            <div key={s} className="relative group">
               <button
                 onClick={() => toggleTooltip(`core-${s}`)}
-                className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded cursor-pointer hover:bg-green-200 transition"
+                className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded hover:bg-green-200 transition"
               >
                 {s}
               </button>
 
-              {/* Tooltip - shows on hover OR click */}
-              {(activeTooltip === `core-${s}`) && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded px-3 py-2 w-56 z-50 shadow-lg">
-                  {skillDescriptions[s] || "No description available yet."}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+              {activeTooltip === `core-${s}` && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded px-3 py-2 max-w-[min(20rem,85vw)] z-50 shadow-lg">
+                  {skillDescriptions[s]?.[lang] || t.noDescription}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900" />
                 </div>
               )}
-              
-              {/* Hover tooltip for desktop */}
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-3 py-2 w-56 z-50 shadow-lg pointer-events-none">
-                {skillDescriptions[s] || "No description available yet."}
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-3 py-2 max-w-[min(20rem,85vw)] z-50 shadow-lg pointer-events-none">
+                {skillDescriptions[s]?.[lang] || t.noDescription}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900" />
               </div>
             </div>
           ))}
@@ -113,72 +175,90 @@ export default function IdeaCard({
 
       {/* Stretch Skills */}
       <div>
-        <p className="text-sm font-medium">Stretch Skills:</p>
-        <div className="flex flex-wrap gap-2 mt-1">
-          {stretchSkills.map((s, i) => (
-            <div key={i} className="relative group">
+        <p className="text-sm font-medium">{t.stretchSkills}</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {stretchSkills.map((s) => (
+            <div key={s} className="relative group">
               <button
                 onClick={() => toggleTooltip(`stretch-${s}`)}
-                className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded cursor-pointer hover:bg-orange-200 transition"
+                className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 transition"
               >
                 {s}
               </button>
 
-              {/* Tooltip - shows on click */}
-              {(activeTooltip === `stretch-${s}`) && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded px-3 py-2 w-56 z-50 shadow-lg">
-                  {skillDescriptions[s] || "No description available yet."}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+              {activeTooltip === `stretch-${s}` && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded px-3 py-2 max-w-[min(20rem,85vw)] z-50 shadow-lg">
+                  {skillDescriptions[s]?.[lang] || t.noDescription}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900" />
                 </div>
               )}
-              
-              {/* Hover tooltip for desktop */}
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-3 py-2 w-56 z-50 shadow-lg pointer-events-none">
-                {skillDescriptions[s] || "No description available yet."}
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded px-3 py-2 max-w-[min(20rem,85vw)] z-50 shadow-lg pointer-events-none">
+                {skillDescriptions[s]?.[lang] || t.noDescription}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900" />
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="w-full">
+      {/* Recommended skill chips (clickable) */}
+      {recommended?.length > 0 && (
+        <div className="pt-2 border-t border-[var(--border)]">
+          <p className="text-xs font-semibold opacity-70 mb-2">
+            💡 {t.recommendSkillsCard ?? "Recommended skills"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {recommended.map((skill) => (
+              <button
+                key={skill}
+                onClick={() => onSkillClick?.(skill)}
+                className="px-2 py-1 rounded-full text-xs border border-[var(--border)] bg-[var(--card)] hover:bg-blue-50 hover:text-blue-700 transition"
+                title="Click to add this skill"
+              >
+                + {skill}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Progress */}
+      <div>
         <div className="flex justify-between text-sm mb-1">
-          <span>Progress</span>
+          <span>{t.progress}</span>
           <span>{progress}%</span>
         </div>
 
-        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+        <div className="w-full h-3 rounded-full overflow-hidden bg-black/10">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${
+            className={`h-full transition-all duration-500 ${
               progress === 100 ? "bg-green-500" : "bg-blue-500"
             }`}
             style={{ width: `${progress}%` }}
           />
         </div>
 
-        {/* Congrats Text */}
         {progress === 100 && (
-          <p className="text-green-600 font-semibold text-center mt-2 animate-bounce">
-            🎉 Project Complete! 🎉
+          <p className="text-green-500 font-semibold text-center mt-2 animate-bounce">
+            {t.projectComplete}
           </p>
         )}
       </div>
 
       {/* Steps */}
       <div className="flex flex-col gap-2">
-        <p className="text-sm font-medium mt-2">Steps:</p>
+        <p className="text-sm font-medium mt-2">{t.steps}</p>
         <ul className="flex flex-col gap-2">
-          {steps.map((step, i) => (
+          {shownSteps.map((step, i) => (
             <label key={i} className="flex items-start gap-2">
               <input
                 type="checkbox"
                 checked={checked.includes(i)}
                 onChange={() => toggle(i)}
-                className="w-4 h-4 mt-0.5 accent-blue-600"
+                className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 accent-blue-600"
               />
-              <span className="text-sm text-gray-700">{step}</span>
+              <span className="text-sm opacity-90 break-words">{step}</span>
             </label>
           ))}
         </ul>
