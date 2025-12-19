@@ -1,48 +1,77 @@
-// app/hooks/useProjectProgress.js
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-export default function useProjectProgress(title, totalSteps) {
+const STORAGE_KEY = "projectProgress";
+
+function sanitizeChecked(arr, totalSteps) {
+  const list = Array.isArray(arr) ? arr : [];
+  const cleaned = Array.from(
+    new Set(
+      list
+        .map((n) => Number(n))
+        .filter((n) => Number.isInteger(n) && n >= 0 && n < totalSteps)
+    )
+  ).sort((a, b) => a - b);
+
+  return cleaned;
+}
+
+export default function useProjectProgress(projectId, totalSteps) {
   const [checked, setChecked] = useState([]);
   const [allProgress, setAllProgress] = useState({});
 
-  // Load saved progress on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("projectProgress");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setAllProgress(parsed);
-      setChecked(parsed[title] || []);
-    }
-  }, [title]);
+  const safeId = useMemo(() => String(projectId ?? ""), [projectId]);
 
-  // Save progress whenever it changes
   useEffect(() => {
-    if (Object.keys(allProgress).length > 0) {
-      localStorage.setItem("projectProgress", JSON.stringify(allProgress));
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      const store = saved && typeof saved === "object" ? saved : {};
+
+      const cleaned = sanitizeChecked(store[safeId] || [], totalSteps);
+
+      setAllProgress(store);
+      setChecked(cleaned);
+
+      // overwrite broken/out-of-range data so it stays fixed
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...store, [safeId]: cleaned })
+      );
+    } catch {
+      setAllProgress({});
+      setChecked([]);
     }
+  }, [safeId, totalSteps]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allProgress));
   }, [allProgress]);
 
   const toggle = (stepIndex) => {
+    if (!Number.isInteger(stepIndex)) return;
+    if (stepIndex < 0 || stepIndex >= totalSteps) return;
+
     setChecked((prev) => {
-      const newChecked = prev.includes(stepIndex)
+      const nextRaw = prev.includes(stepIndex)
         ? prev.filter((i) => i !== stepIndex)
         : [...prev, stepIndex];
 
-      // Update global progress
+      const next = sanitizeChecked(nextRaw, totalSteps);
+
       setAllProgress((prevAll) => ({
         ...prevAll,
-        [title]: newChecked,
+        [safeId]: next,
       }));
 
-      return newChecked;
+      return next;
     });
   };
 
-  const progress = totalSteps > 0 
-    ? Math.round((checked.length / totalSteps) * 100)
-    : 0;
+  const rawProgress =
+    totalSteps > 0 ? Math.round((checked.length / totalSteps) * 100) : 0;
+
+  const progress = Math.min(100, Math.max(0, rawProgress));
 
   return { checked, toggle, progress };
 }

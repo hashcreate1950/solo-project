@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { ideas } from "./ideas";
 import IdeaList from "./components/IdeaList";
 import { messages } from "./data/messages";
+import BubbleMenu from "./components/react-bits/BubbleMenu.jsx";
+
+
 
 const ALL_SKILLS = [
   "html",
@@ -84,11 +87,14 @@ export default function Home() {
     setSkillProgress((prev) => ({ ...prev, [skill]: !prev[skill] }));
   };
 
-  const buildRankedIdeas = () => {
-    const selectedSkills = Object.keys(skillProgress).filter((s) => skillProgress[s]);
+  const selectedSkills = Object.keys(skillProgress).filter((s) => skillProgress[s]);
 
-    return ideas
-      .map((idea) => {
+const buildRankedIdeas = () => {
+  const completedIds = completed.map(p => p.id);
+  
+  return ideas
+    .filter(idea => !completedIds.includes(idea.id)) 
+    .map((idea) => {
         const core = idea.coreSkills || [];
         const stretch = idea.stretchSkills || [];
 
@@ -170,66 +176,86 @@ export default function Home() {
 
   const completedCount = completed.length;
 
+  const primaryBtn =
+    "px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition";
+  const secondaryBtn =
+    "px-6 py-3 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-medium hover:bg-black/5 transition";
+  const ghostBtn =
+    "px-6 py-3 rounded-xl border border-[var(--border)] bg-transparent text-sm font-medium hover:bg-black/5 transition";
+
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto max-w-5xl px-4 py-10 text-center relative">
-        <div className="flex justify-end gap-2 mb-6">
+        <div className="flex justify-end gap-2 mb-8">
           <button
             onClick={() => setLang(lang === "en" ? "mn" : "en")}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-sm hover:opacity-80 transition"
+            className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm hover:bg-black/5 transition"
           >
             {t.langToggle}
           </button>
 
           <button
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1 text-sm hover:opacity-80 transition"
+            className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm hover:bg-black/5 transition"
           >
             {theme === "light" ? "Dark" : "Light"}
           </button>
         </div>
 
-        <h1 className="text-3xl font-bold mb-6">{t.appTitle}</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight mb-2">
+            {t.appTitle}
+          </h1>
+          <p className="text-sm sm:text-base opacity-75 max-w-2xl mx-auto">
+            Select skills you are working on. Generate a small set of project ideas you can finish.
+          </p>
+        </div>
 
-        <div className="mb-8 bg-[var(--card)] border border-[var(--border)] rounded-xl p-4">
-          <h2 className="text-sm font-semibold mb-3">{t.skillsTitle}</h2>
+        <div className="mb-6 bg-[var(--card)] border border-[var(--border)] rounded-xl p-5 text-left">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-sm font-semibold">{t.skillsTitle}</h2>
+            <div className="text-xs opacity-70">
+              Selected: {selectedSkills.length}
+            </div>
+          </div>
 
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
             {ALL_SKILLS.map((skill) => (
               <button
                 key={skill}
                 onClick={() => toggleSkill(skill)}
-                className={`px-3 py-2 rounded-lg border text-sm transition ${
+                className={`px-3 py-2 rounded-xl border text-sm transition ${
                   skillProgress[skill]
-                    ? "bg-green-600 text-white border-green-700"
-                    : "border-[var(--border)] hover:opacity-80"
+                    ? "bg-blue-600 text-white border-blue-700"
+                    : "border-[var(--border)] bg-transparent hover:bg-black/5"
                 }`}
               >
                 {skill}
               </button>
             ))}
           </div>
+
+          {selectedSkills.length === 0 && (
+            <div className="mt-4 text-sm opacity-70">
+              Pick at least one skill to generate ideas.
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-3 mb-6">
+        <div className="flex flex-wrap justify-center gap-3 mb-8">
           <button
             onClick={generateIdeas}
-            className="px-8 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+            disabled={selectedSkills.length === 0}
+            className={`${primaryBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {t.generate}
           </button>
 
-          <button
-            onClick={surpriseMe}
-            className="px-6 py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition"
-          >
+          <button onClick={surpriseMe} className={secondaryBtn}>
             {t.surpriseMe ?? "Surprise me"}
           </button>
 
-          <button
-            onClick={clearAll}
-            className="px-6 py-3 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm hover:opacity-80 transition"
-          >
+          <button onClick={clearAll} className={ghostBtn}>
             {t.clear ?? "Clear"}
           </button>
         </div>
@@ -244,7 +270,7 @@ export default function Home() {
 
         <div className="fixed bottom-4 right-4 z-50">
           {completedOpen ? (
-            <div className="w-[min(22rem,92vw)] bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
+            <div className="w-[min(22rem,92vw)] bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
                 <div className="text-sm font-semibold">
                   {t.completedTitle ?? "Completed"}{" "}
@@ -252,7 +278,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => setCompletedOpen(false)}
-                  className="text-sm opacity-70 hover:opacity-100 transition"
+                  className="text-sm opacity-60 hover:opacity-100 transition"
                   title="Minimize"
                 >
                   —
@@ -269,7 +295,7 @@ export default function Home() {
                     {completed.map((p) => (
                       <li
                         key={p.id}
-                        className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2"
+                        className="flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-2"
                       >
                         <button
                           onClick={() => openCompletedIdea(p.id)}
@@ -284,7 +310,7 @@ export default function Home() {
                           className="text-xs opacity-60 hover:opacity-100 transition"
                           title="Remove"
                         >
-                          ✕
+                          Remove
                         </button>
                       </li>
                     ))}
@@ -295,7 +321,7 @@ export default function Home() {
           ) : (
             <button
               onClick={() => setCompletedOpen(true)}
-              className="rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-lg px-4 py-2 text-sm hover:opacity-90 transition"
+              className="rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-sm px-4 py-2 text-sm hover:bg-black/5 transition"
               title="Open completed projects"
             >
               {t.completedTitle ?? "Completed"} ({completedCount})
@@ -310,7 +336,7 @@ export default function Home() {
               : "opacity-0 translate-y-2 pointer-events-none"
           }`}
         >
-          <div className="px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-lg text-sm">
+          <div className="px-4 py-2 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-sm text-sm">
             {toast}
           </div>
         </div>

@@ -24,11 +24,12 @@ export default function IdeaCard({
 }) {
   const t = messages[lang] || messages.en;
 
-  const reportedCompleteRef = useRef(false);
   const confettiTimer = useRef(null);
+  const prevProgressRef = useRef(null);
 
   const shownTitle = typeof title === "object" ? title?.[lang] : title;
-  const shownDesc = typeof description === "object" ? description?.[lang] : description;
+  const shownDesc =
+    typeof description === "object" ? description?.[lang] : description;
   const shownSteps = Array.isArray(steps) ? steps : steps?.[lang] || [];
 
   const { checked, toggle, progress } = useProjectProgress(id, shownSteps.length);
@@ -45,20 +46,22 @@ export default function IdeaCard({
   };
 
   useEffect(() => {
-    if (progress === 100) {
+    const prev = prevProgressRef.current;
+
+    if (prev === null) {
+      prevProgressRef.current = progress;
+      return;
+    }
+
+    if (prev < 100 && progress === 100) {
       burstConfetti();
 
-      if (!reportedCompleteRef.current) {
-        reportedCompleteRef.current = true;
-        const safeTitle = shownTitle || title?.en || title || `Project ${id}`;
-        onProjectComplete?.({ id, title: safeTitle });
-      }
+      const safeTitle = shownTitle || title?.en || title || `Project ${id}`;
+      onProjectComplete?.({ id, title: safeTitle });
     }
-  }, [progress]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (progress < 100) reportedCompleteRef.current = false;
-  }, [progress]);
+    prevProgressRef.current = progress;
+  }, [progress, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -93,12 +96,16 @@ export default function IdeaCard({
 
       <div className="flex justify-between items-start gap-3">
         <div className="min-w-0">
-          <h3 className="text-base sm:text-lg font-semibold break-words">{shownTitle}</h3>
+          <h3 className="text-base sm:text-lg font-semibold break-words">
+            {shownTitle}
+          </h3>
           <p className="text-sm mt-1 opacity-80 break-words">{shownDesc}</p>
 
           {why && (
             <p className="text-xs mt-2 opacity-70">
-              <span className="font-semibold">{t.whyThisIdea ?? "Why this idea?"}</span>{" "}
+              <span className="font-semibold">
+                {t.whyThisIdea ?? "Why this idea?"}
+              </span>{" "}
               {why}
             </p>
           )}
@@ -116,8 +123,12 @@ export default function IdeaCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">{difficulty}</span>
-        <span className="px-2 py-1 rounded bg-purple-100 text-purple-700">{category}</span>
+        <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">
+          {difficulty}
+        </span>
+        <span className="px-2 py-1 rounded bg-purple-100 text-purple-700">
+          {category}
+        </span>
 
         <div className="flex-1" />
 
